@@ -1,0 +1,36 @@
+node_modules/
+dist/
+release/
+build/
+*.log
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+backend/.env
+backend/.env.production
+frontend/.env
+
+# Dependencies
+backend/node_modules
+frontend/node_modules
+
+# Build outputs
+frontend/dist
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+backend/uploads/*
+
+# Installers
+*.exe
+*.dmg
+*.AppImage
+
+# Archive folder
+archive/
+
+# Editor settings (optional - uncomment if you want to ignore)
+# .vscode/

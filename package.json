@@ -1,0 +1,72 @@
+{
+  "name": "unicorn-ev",
+  "version": "1.0.0",
+  "description": "Unicorn EV Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on http://localhost:5174 && npm start\"",
+    "dev:backend": "cd backend && node server.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm install --production",
+    "build:win": "npm run build && npm run build:backend && electron-builder --win",
+    "build:all": "npm run build && npm run build:backend && electron-builder -mwl",
+    "package": "electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "fs-extra": "^11.3.3",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.unicornev.app",
+    "productName": "Unicorn EV",
+    "files": [
+      "main.js",
+      "preload.js",
+      "backend/**/*",
+      "!backend/scripts/checkAdmin.js",
+      "!backend/scripts/resetAdmin.js",
+      "!backend/scripts/testLogin.js",
+      "!backend/scripts/testLoginAPI.js",
+      "!backend/uploads",
+      "frontend/dist/**/*",
+      "frontend/src/assets/Logo.png",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "backend/**/*"
+    ],
+    "afterPack": "./build-scripts/afterPack.js",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "frontend/src/assets/Logo.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Unicorn EV"
+    }
+  }
+}
