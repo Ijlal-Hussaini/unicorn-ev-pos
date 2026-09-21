@@ -300,6 +300,138 @@ const getInventoryStats = async (req, res) => {
   }
 };
 
+// @desc    Get available serialized units for a product
+// @route   GET /api/products/:id/units/available
+// @access  Private
+const getAvailableUnits = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const availableUnits = (product.units || []).filter(u => u.status === 'available');
+
+    res.status(200).json({
+      success: true,
+      count: availableUnits.length,
+      data: availableUnits,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching available units',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Add serialized unit to product
+// @route   POST /api/products/:id/units
+// @access  Private (Admin/Manager)
+const addSerializedUnit = async (req, res) => {
+  try {
+    const { chassisNumber, motorNumber, batterySerial, color } = req.body;
+
+    if (!chassisNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chassis number is required for serialized unit',
+      });
+    }
+
+    const cleanChassis = chassisNumber.trim().toUpperCase();
+
+    // Check if chassis exists in ANY product
+    const existingUnit = await Product.findOne({ 'units.chassisNumber': cleanChassis });
+    if (existingUnit) {
+      return res.status(400).json({
+        success: false,
+        message: `Unit with Chassis Number "${cleanChassis}" already exists in inventory (Model: ${existingUnit.model || existingUnit.name})`,
+      });
+    }
+
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    product.units.push({
+      chassisNumber: cleanChassis,
+      motorNumber: motorNumber ? motorNumber.trim().toUpperCase() : undefined,
+      batterySerial: batterySerial ? batterySerial.trim().toUpperCase() : undefined,
+      color: color ? color.trim() : undefined,
+      status: 'available',
+    });
+
+    product.lastRestocked = Date.now();
+    await product.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Serialized unit added successfully',
+      data: product,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error adding unit',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Delete serialized unit from product
+// @route   DELETE /api/products/:id/units/:unitId
+// @access  Private (Admin/Manager)
+const deleteSerializedUnit = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const unit = product.units.id(req.params.unitId);
+    if (!unit) {
+      return res.status(404).json({
+        success: false,
+        message: 'Unit not found',
+      });
+    }
+
+    if (unit.status === 'sold') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete a sold unit. Process a refund or return first.',
+      });
+    }
+
+    product.units.pull(req.params.unitId);
+    await product.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Serialized unit removed successfully',
+      data: product,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error removing unit',
+      error: error.message,
+    });
+  }
+};
+
 export {
   getProducts,
   getProduct,
@@ -307,5 +439,8 @@ export {
   updateProduct,
   deleteProduct,
   updateStock,
-  getInventoryStats
+  getInventoryStats,
+  getAvailableUnits,
+  addSerializedUnit,
+  deleteSerializedUnit,
 };

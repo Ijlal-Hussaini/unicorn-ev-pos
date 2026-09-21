@@ -40,6 +40,40 @@ const installmentSchema = new mongoose.Schema(
       required: [true, 'Customer CNIC is required for installments'],
       trim: true,
     },
+    customerAddress: {
+      type: String,
+      trim: true,
+    },
+    guarantors: [{
+      name: {
+        type: String,
+        trim: true,
+      },
+      cnic: {
+        type: String,
+        trim: true,
+      },
+      phone: {
+        type: String,
+        trim: true,
+      },
+      secondaryPhone: {
+        type: String,
+        trim: true,
+      },
+      relation: {
+        type: String,
+        trim: true,
+      },
+      address: {
+        type: String,
+        trim: true,
+      },
+      workplace: {
+        type: String,
+        trim: true,
+      },
+    }],
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',

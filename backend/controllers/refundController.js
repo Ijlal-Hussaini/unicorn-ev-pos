@@ -233,6 +233,7 @@ const createRefund = async (req, res) => {
       customerPhone: sale.customerPhone,
       product: sale.product._id,
       model: sale.model,
+      chassisNumber: sale.chassisNumber || undefined,
       quantityRefunded,
       originalQuantity: sale.quantity,
       pricePerUnit: sale.price,
@@ -328,10 +329,19 @@ const approveRefund = async (req, res) => {
       await sale.save({ session });
     }
 
-    // If restock is enabled, add quantity back to product
+    // If restock is enabled, add quantity back to product and release unit
     if (refund.restockProduct) {
       const product = await Product.findById(refund.product).session(session);
       if (product) {
+        if (sale && sale.chassisNumber && product.units) {
+          const unit = product.units.find(u => u.chassisNumber === sale.chassisNumber);
+          if (unit) {
+            unit.status = 'available';
+            unit.soldAt = undefined;
+            unit.saleInvoiceId = undefined;
+            unit.saleInvoiceNumber = undefined;
+          }
+        }
         product.stock += refund.quantityRefunded;
         await product.save({ session });
       }

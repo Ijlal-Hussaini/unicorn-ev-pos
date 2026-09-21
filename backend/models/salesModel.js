@@ -14,12 +14,39 @@ const salesSchema = new mongoose.Schema(
       required: [true, 'Customer name is required'],
       trim: true,
     },
+    customerCnic: {
+      type: String,
+      trim: true,
+    },
     customerEmail: {
       type: String,
       trim: true,
       lowercase: true,
     },
     customerPhone: {
+      type: String,
+      trim: true,
+    },
+    customerAddress: {
+      type: String,
+      trim: true,
+    },
+    chassisNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    motorNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    batterySerial: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    color: {
       type: String,
       trim: true,
     },
@@ -138,6 +165,8 @@ salesSchema.pre('save', function () {
 
 // Index for faster queries
 salesSchema.index({ customer: 1 });
+salesSchema.index({ customerCnic: 1 });
+salesSchema.index({ chassisNumber: 1 });
 salesSchema.index({ status: 1 });
 salesSchema.index({ createdAt: -1 });
 salesSchema.index({ soldBy: 1 });

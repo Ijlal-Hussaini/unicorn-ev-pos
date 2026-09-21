@@ -37,6 +37,25 @@ const CreateInstallment = () => {
     notes: '',
   });
 
+  // Pakistani Guarantor (Zamin) KYC State
+  const [guarantor1, setGuarantor1] = useState({
+    name: '',
+    cnic: '',
+    phone: '',
+    relation: '',
+    address: '',
+    workplace: '',
+  });
+
+  const [guarantor2, setGuarantor2] = useState({
+    name: '',
+    cnic: '',
+    phone: '',
+    relation: '',
+    address: '',
+    workplace: '',
+  });
+
   useEffect(() => {
     fetchEligibleSales();
     
@@ -185,10 +204,20 @@ const CreateInstallment = () => {
 
     try {
       setLoading(true);
+
+      const guarantors = [];
+      if (guarantor1.name?.trim() || guarantor1.cnic?.trim()) {
+        guarantors.push(guarantor1);
+      }
+      if (guarantor2.name?.trim() || guarantor2.cnic?.trim()) {
+        guarantors.push(guarantor2);
+      }
+
       // Trim CNIC before sending
       const submissionData = {
         ...formData,
-        customerCNIC: formData.customerCNIC.trim()
+        customerCNIC: formData.customerCNIC.trim(),
+        guarantors,
       };
       await installmentsAPI.create(submissionData);
       toast({
@@ -425,6 +454,157 @@ const CreateInstallment = () => {
                         className="w-full min-h-[80px] px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         placeholder="Additional notes about this installment plan..."
                       />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Guarantors (Zamin) KYC Card */}
+              <Card className="bg-card/90 border-border backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4 border-b pb-2">
+                    <div>
+                      <h2 className="text-xl font-semibold text-foreground">Guarantors KYC (Zamin Details)</h2>
+                      <p className="text-xs text-muted-foreground">Pakistani Legal Installment Compliance & Verification</p>
+                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded">
+                      2 Guarantors Supported
+                    </span>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Guarantor 1 */}
+                    <div className="p-4 bg-accent/20 rounded-lg border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-sm text-cyan-400 uppercase tracking-wider">Primary Guarantor (Zamin 1)</h3>
+                        <span className="text-[10px] text-muted-foreground">Mandatory for high-value bikes</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <Label className="text-xs">Full Name</Label>
+                          <Input
+                            value={guarantor1.name}
+                            onChange={(e) => setGuarantor1({ ...guarantor1, name: e.target.value })}
+                            placeholder="e.g. Muhammad Tariq"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">CNIC Number</Label>
+                          <Input
+                            value={guarantor1.cnic}
+                            onChange={(e) => setGuarantor1({ ...guarantor1, cnic: e.target.value.replace(/\D/g, '') })}
+                            placeholder="13 digits (no dashes)"
+                            maxLength={13}
+                            className="bg-background border-border font-mono text-xs h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Phone Number</Label>
+                          <Input
+                            value={guarantor1.phone}
+                            onChange={(e) => setGuarantor1({ ...guarantor1, phone: e.target.value })}
+                            placeholder="0300-1234567"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Relation with Customer</Label>
+                          <Input
+                            value={guarantor1.relation}
+                            onChange={(e) => setGuarantor1({ ...guarantor1, relation: e.target.value })}
+                            placeholder="e.g. Brother, Uncle, Business Partner"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Workplace / Business Name</Label>
+                          <Input
+                            value={guarantor1.workplace}
+                            onChange={(e) => setGuarantor1({ ...guarantor1, workplace: e.target.value })}
+                            placeholder="Company, Shop, or Government Department"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Label className="text-xs">Residential Address</Label>
+                          <Input
+                            value={guarantor1.address}
+                            onChange={(e) => setGuarantor1({ ...guarantor1, address: e.target.value })}
+                            placeholder="Permanent residential address as per CNIC"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Guarantor 2 */}
+                    <div className="p-4 bg-accent/10 rounded-lg border border-border/80 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-sm text-foreground/80 uppercase tracking-wider">Secondary Guarantor (Zamin 2)</h3>
+                        <span className="text-[10px] text-muted-foreground">Optional</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <Label className="text-xs">Full Name</Label>
+                          <Input
+                            value={guarantor2.name}
+                            onChange={(e) => setGuarantor2({ ...guarantor2, name: e.target.value })}
+                            placeholder="e.g. Abdul Rehman"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">CNIC Number</Label>
+                          <Input
+                            value={guarantor2.cnic}
+                            onChange={(e) => setGuarantor2({ ...guarantor2, cnic: e.target.value.replace(/\D/g, '') })}
+                            placeholder="13 digits"
+                            maxLength={13}
+                            className="bg-background border-border font-mono text-xs h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Phone Number</Label>
+                          <Input
+                            value={guarantor2.phone}
+                            onChange={(e) => setGuarantor2({ ...guarantor2, phone: e.target.value })}
+                            placeholder="0321-9876543"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Relation with Customer</Label>
+                          <Input
+                            value={guarantor2.relation}
+                            onChange={(e) => setGuarantor2({ ...guarantor2, relation: e.target.value })}
+                            placeholder="e.g. Neighbor, Colleague"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Workplace / Business Name</Label>
+                          <Input
+                            value={guarantor2.workplace}
+                            onChange={(e) => setGuarantor2({ ...guarantor2, workplace: e.target.value })}
+                            placeholder="Office or Business location"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Label className="text-xs">Residential Address</Label>
+                          <Input
+                            value={guarantor2.address}
+                            onChange={(e) => setGuarantor2({ ...guarantor2, address: e.target.value })}
+                            placeholder="Residential address"
+                            className="bg-background border-border text-xs h-9"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

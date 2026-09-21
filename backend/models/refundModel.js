@@ -43,6 +43,11 @@ const refundSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Model name is required'],
     },
+    chassisNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
     quantityRefunded: {
       type: Number,
       required: [true, 'Refund quantity is required'],

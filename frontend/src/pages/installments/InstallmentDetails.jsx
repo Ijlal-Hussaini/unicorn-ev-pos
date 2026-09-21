@@ -13,9 +13,12 @@ import {
   XCircle,
   AlertCircle,
   CreditCard,
+  Scale,
+  ShieldCheck,
 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import NavigationPanel from '../../components/NavigationPanel';
+import InstallmentAgreementModal from '../../components/InstallmentAgreement';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,6 +57,7 @@ const InstallmentDetails = () => {
     paymentMethod: 'Cash',
     notes: '',
   });
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
 
   const canManage = user?.role === 'admin' || user?.role === 'manager';
 
@@ -268,12 +272,21 @@ const InstallmentDetails = () => {
               <p className="text-muted-foreground">Installment Plan Details</p>
             </div>
           </div>
-          <Badge className={getStatusColor(plan.status)}>
-            <span className="flex items-center gap-1">
-              {getStatusIcon(plan.status)}
-              {plan.status}
-            </span>
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setShowAgreementModal(true)}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+            >
+              <Scale className="w-4 h-4 mr-2" />
+              Print Legal Agreement
+            </Button>
+            <Badge className={getStatusColor(plan.status)}>
+              <span className="flex items-center gap-1">
+                {getStatusIcon(plan.status)}
+                {plan.status}
+              </span>
+            </Badge>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -397,6 +410,47 @@ const InstallmentDetails = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Guarantors (Zamin) KYC Card */}
+        <Card className="bg-card/90 border-border backdrop-blur-sm mb-6">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4 border-b pb-2">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-cyan-400" />
+                Guarantors KYC (ضامنان)
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {plan.guarantors?.length || 0} Registered Guarantor(s)
+              </span>
+            </div>
+
+            {plan.guarantors && plan.guarantors.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {plan.guarantors.map((g, idx) => (
+                  <div key={idx} className="p-4 bg-accent/20 rounded-lg border border-border space-y-2 text-sm">
+                    <div className="flex justify-between items-center border-b border-border pb-1">
+                      <span className="font-bold text-cyan-400 uppercase text-xs">
+                        {idx === 0 ? 'Primary Guarantor (Zamin 1)' : 'Secondary Guarantor (Zamin 2)'}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-mono">{g.cnic || 'No CNIC'}</span>
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <p><span className="text-muted-foreground">Name:</span> <strong className="text-foreground">{g.name || 'N/A'}</strong></p>
+                      <p><span className="text-muted-foreground">Phone:</span> <strong className="text-foreground">{g.phone || 'N/A'}</strong></p>
+                      <p><span className="text-muted-foreground">Relation:</span> <span className="text-foreground">{g.relation || 'N/A'}</span></p>
+                      <p><span className="text-muted-foreground">Workplace:</span> <span className="text-foreground">{g.workplace || 'N/A'}</span></p>
+                      <p><span className="text-muted-foreground">Address:</span> <span className="text-foreground">{g.address || 'N/A'}</span></p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                No formal guarantors were recorded on this installment plan.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Actions */}
         {plan.status === 'active' && (
@@ -589,6 +643,15 @@ const InstallmentDetails = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Legal Installment Agreement (Stamp Format) Modal */}
+      {plan && (
+        <InstallmentAgreementModal
+          isOpen={showAgreementModal}
+          onClose={() => setShowAgreementModal(false)}
+          plan={plan}
+        />
+      )}
     </div>
   );
 };

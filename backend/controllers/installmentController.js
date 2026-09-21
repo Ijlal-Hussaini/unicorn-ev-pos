@@ -175,6 +175,8 @@ const createInstallmentPlan = async (req, res) => {
     const {
       saleId,
       customerCNIC,
+      customerAddress,
+      guarantors,
       downPayment,
       numberOfInstallments,
       frequency = 'monthly',
@@ -268,6 +270,8 @@ const createInstallmentPlan = async (req, res) => {
       customerEmail: sale.customerEmail,
       customerPhone: sale.customerPhone,
       customerCNIC,
+      customerAddress: customerAddress || sale.customerAddress,
+      guarantors: Array.isArray(guarantors) ? guarantors : [],
       product: sale.product._id,
       productName: sale.product.name,
       totalAmount: sale.total,
@@ -654,6 +658,42 @@ const getInstallmentStats = async (req, res) => {
   }
 };
 
+// @desc    Update installment plan guarantors / KYC
+// @route   PUT /api/installments/:id/guarantors
+// @access  Private (Admin/Manager)
+const updateGuarantors = async (req, res) => {
+  try {
+    const { guarantors, customerCNIC, customerAddress } = req.body;
+    const plan = await Installment.findById(req.params.id);
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Installment plan not found',
+      });
+    }
+
+    if (Array.isArray(guarantors)) {
+      plan.guarantors = guarantors;
+    }
+    if (customerCNIC) plan.customerCNIC = customerCNIC;
+    if (customerAddress) plan.customerAddress = customerAddress;
+
+    await plan.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Guarantor KYC updated successfully',
+      data: plan,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error updating guarantors',
+      error: error.message,
+    });
+  }
+};
+
 export {
   getInstallmentPlans,
   getInstallmentPlan,
@@ -664,4 +704,5 @@ export {
   cancelInstallmentPlan,
   getOverdueInstallments,
   getInstallmentStats,
+  updateGuarantors,
 };

@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, session } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -14,7 +14,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false // Allow loading images from Cloudinary
+      webSecurity: true
     }
   });
 
@@ -88,10 +88,11 @@ function startBackend() {
     } else {
       console.error('WARNING: MONGO_URI not found in environment!');
     }
+    env.ELECTRON_RUN_AS_NODE = '1';
   }
 
-  // Use system node
-  const nodeExecutable = 'node';
+  // Use embedded Electron runtime when packaged so target PC does not need Node installed
+  const nodeExecutable = app.isPackaged ? process.execPath : 'node';
   console.log('Using Node executable:', nodeExecutable);
 
   try {
@@ -126,7 +127,7 @@ function startBackend() {
         if (!backendProcess || backendProcess.killed) {
           const { dialog } = require('electron');
           dialog.showErrorBox('Backend Error', 
-            `Failed to start backend server.\n\nError: ${err.message}\n\nPlease ensure Node.js is installed on your system.`);
+            `Failed to start backend server.\n\nError: ${err.message}`);
         }
       }, 1000);
     });
@@ -149,6 +150,22 @@ function startBackend() {
 }
 
 app.whenReady().then(() => {
+  // Set Content-Security-Policy header to securely allow Cloudinary, localhost, and fonts
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; " +
+          "img-src 'self' data: blob: https://res.cloudinary.com http://localhost:* http://127.0.0.1:*; " +
+          "media-src 'self' data: blob: https://res.cloudinary.com; " +
+          "font-src 'self' data:; " +
+          "connect-src 'self' http://localhost:* http://127.0.0.1:* https://res.cloudinary.com ws://localhost:* ws://127.0.0.1:*;"
+        ]
+      }
+    });
+  });
+
   // Give backend a moment to start before opening window
   startBackend();
   setTimeout(() => {

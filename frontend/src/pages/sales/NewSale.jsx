@@ -10,7 +10,8 @@ import {
   Printer,
   Download,
   CheckCircle,
-  Calendar
+  Calendar,
+  FileText
 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import NavigationPanel from '../../components/NavigationPanel';
@@ -28,6 +29,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { salesAPI, productsAPI } from '../../services/api';
 import Receipt from '../../components/Receipt';
+import HandoverModal from '../../components/HandoverDocuments';
 
 const NewSale = () => {
   const navigate = useNavigate();
@@ -74,6 +76,17 @@ const NewSale = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [cnicError, setCnicError] = useState('');
+  
+  // Serialized unit states for EV Bikes
+  const [availableUnits, setAvailableUnits] = useState([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState(null);
+  const [customChassis, setCustomChassis] = useState('');
+  const [customMotor, setCustomMotor] = useState('');
+  const [customBattery, setCustomBattery] = useState('');
+  const [customColor, setCustomColor] = useState('');
+  const [receiptFormat, setReceiptFormat] = useState('standard');
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -107,9 +120,33 @@ const NewSale = () => {
     }
   };
 
-  const handleProductSelect = (product) => {
+  const handleProductSelect = async (product) => {
     setSelectedProduct(product);
     setSelectedQuantity(1);
+    setSelectedUnit(null);
+    setCustomChassis('');
+    setCustomMotor('');
+    setCustomBattery('');
+    setCustomColor('');
+
+    if (product?.category === 'EV Bikes' || product?._id) {
+      try {
+        setLoadingUnits(true);
+        const res = await productsAPI.getAvailableUnits(product._id);
+        const units = res.data || [];
+        setAvailableUnits(units);
+        if (units.length > 0) {
+          setSelectedUnit(units[0]);
+        }
+      } catch (err) {
+        console.error('Failed to load available units', err);
+        setAvailableUnits([]);
+      } finally {
+        setLoadingUnits(false);
+      }
+    } else {
+      setAvailableUnits([]);
+    }
   };
 
   const addToCart = () => {
@@ -140,10 +177,22 @@ const NewSale = () => {
       return;
     }
 
+    const unitDetails = selectedUnit ? {
+      chassisNumber: selectedUnit.chassisNumber,
+      motorNumber: selectedUnit.motorNumber,
+      batterySerial: selectedUnit.batterySerial,
+      color: selectedUnit.color
+    } : customChassis ? {
+      chassisNumber: customChassis.trim().toUpperCase(),
+      motorNumber: customMotor.trim().toUpperCase(),
+      batterySerial: customBattery.trim().toUpperCase(),
+      color: customColor.trim()
+    } : null;
+
     // Check if product already in cart
     const existingIndex = cart.findIndex(item => item.product._id === selectedProduct._id);
     
-    if (existingIndex >= 0) {
+    if (existingIndex >= 0 && !unitDetails) {
       // Update quantity
       const newCart = [...cart];
       newCart[existingIndex].quantity += selectedQuantity;
@@ -153,10 +202,11 @@ const NewSale = () => {
         description: `${selectedProduct.name} quantity updated in cart`,
       });
     } else {
-      // Add new item
+      // Add new item with serialized vehicle info
       setCart([...cart, {
         product: selectedProduct,
-        quantity: selectedQuantity
+        quantity: selectedQuantity,
+        selectedUnit: unitDetails
       }]);
       toast({
         title: 'Added to Cart',
@@ -327,14 +377,22 @@ const NewSale = () => {
         const salePayload = {
           invoiceId: `INV-${Date.now()}-${item.product._id.slice(-4)}`,
           customer: customerDetails.name,
+          customerCnic: customerDetails.cnic || undefined,
           customerEmail: customerDetails.email,
           customerPhone: customerDetails.phone,
+          customerAddress: typeof customerDetails.address === 'string'
+            ? customerDetails.address
+            : `${customerDetails.address?.street || ''}, ${customerDetails.address?.city || ''}`.replace(/^,\s*/, '').trim(),
           productId: item.product._id,
           quantity: item.quantity,
           paymentMethod: saleData.paymentType === 'installment' ? 'Installment' : saleData.paymentMethod,
           paymentType: saleData.paymentType,
           status: saleData.paymentType === 'installment' ? 'completed' : saleData.status,
           notes: saleData.notes,
+          chassisNumber: item.selectedUnit?.chassisNumber || undefined,
+          motorNumber: item.selectedUnit?.motorNumber || undefined,
+          batterySerial: item.selectedUnit?.batterySerial || undefined,
+          color: item.selectedUnit?.color || undefined,
           customerDetails: customerDetails
         };
 
@@ -342,7 +400,8 @@ const NewSale = () => {
         createdSales.push({
           ...response.data,
           product: item.product,
-          quantity: item.quantity
+          quantity: item.quantity,
+          selectedUnit: item.selectedUnit
         });
       }
       
@@ -1012,6 +1071,86 @@ const NewSale = () => {
                           </div>
                         </div>
 
+                        {/* Serialized Unit Selection for EV Bikes */}
+                        {selectedProduct.category === 'EV Bikes' && (
+                          <div className="p-3 bg-card border border-border rounded-lg space-y-3 mb-4">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                                EV Vehicle Identification (Chassis / Motor)
+                              </Label>
+                              {loadingUnits && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                            </div>
+
+                            {availableUnits.length > 0 ? (
+                              <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Select In-Stock Chassis Number:</Label>
+                                <select
+                                  value={selectedUnit ? selectedUnit.chassisNumber : 'custom'}
+                                  onChange={(e) => {
+                                    if (e.target.value === 'custom') {
+                                      setSelectedUnit(null);
+                                    } else {
+                                      const u = availableUnits.find(unit => unit.chassisNumber === e.target.value);
+                                      setSelectedUnit(u || null);
+                                    }
+                                  }}
+                                  className="w-full h-9 rounded-md border border-border bg-background px-3 py-1 text-xs text-foreground"
+                                >
+                                  {availableUnits.map(unit => (
+                                    <option key={unit._id} value={unit.chassisNumber}>
+                                      Chassis: {unit.chassisNumber} {unit.motorNumber ? `| Motor: ${unit.motorNumber}` : ''} {unit.color ? `(${unit.color})` : ''}
+                                    </option>
+                                  ))}
+                                  <option value="custom">+ Manual / Other Chassis Number</option>
+                                </select>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-amber-400">No pre-registered units found in stock. You can enter vehicle details manually below:</p>
+                            )}
+
+                            {(!selectedUnit || availableUnits.length === 0) && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                <div>
+                                  <Label className="text-[11px] text-muted-foreground">Chassis / Frame Number *</Label>
+                                  <Input
+                                    value={customChassis}
+                                    onChange={(e) => setCustomChassis(e.target.value.toUpperCase())}
+                                    placeholder="e.g. UEV-2026-CH8812"
+                                    className="h-8 text-xs font-mono uppercase bg-background border-border"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[11px] text-muted-foreground">Motor Number</Label>
+                                  <Input
+                                    value={customMotor}
+                                    onChange={(e) => setCustomMotor(e.target.value.toUpperCase())}
+                                    placeholder="e.g. MOT-800W-5542"
+                                    className="h-8 text-xs font-mono uppercase bg-background border-border"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[11px] text-muted-foreground">Battery Pack Serial</Label>
+                                  <Input
+                                    value={customBattery}
+                                    onChange={(e) => setCustomBattery(e.target.value.toUpperCase())}
+                                    placeholder="e.g. BAT-72V-32AH-90"
+                                    className="h-8 text-xs font-mono uppercase bg-background border-border"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[11px] text-muted-foreground">Color</Label>
+                                  <Input
+                                    value={customColor}
+                                    onChange={(e) => setCustomColor(e.target.value)}
+                                    placeholder="e.g. Metallic Blue"
+                                    className="h-8 text-xs bg-background border-border"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <div className="space-y-2">
                           <Label htmlFor="selectedQuantity">Quantity</Label>
                           <Input
@@ -1134,6 +1273,11 @@ const NewSale = () => {
                             <div className="flex-1">
                               <p className="font-semibold text-sm">{item.product.name}</p>
                               <p className="text-xs text-muted-foreground">{formatCurrency(item.product.price)} × {item.quantity}</p>
+                              {item.selectedUnit?.chassisNumber && (
+                                <span className="inline-block mt-1 text-[10px] font-mono bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                                  VIN: {item.selectedUnit.chassisNumber}
+                                </span>
+                              )}
                             </div>
                             <Button
                               type="button"
@@ -1254,8 +1398,33 @@ const NewSale = () => {
           {/* Receipt Preview */}
           {completedSale && (
             <div className="p-6">
+              {/* Receipt Format Switcher */}
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-border">
+                <div className="flex items-center gap-2 bg-muted/60 p-1 rounded-lg border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setReceiptFormat('standard')}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                      receiptFormat === 'standard' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    A4/A5 Standard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReceiptFormat('thermal')}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                      receiptFormat === 'thermal' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    80mm Thermal (POS)
+                  </button>
+                </div>
+              </div>
+
               <Receipt
                 ref={receiptRef}
+                format={receiptFormat}
                 saleData={completedSale.sales?.[0] || {}}
                 customerData={completedSale.customerData}
                 cartItems={completedSale.cartItems}
@@ -1275,6 +1444,16 @@ const NewSale = () => {
                   Create Installment Plan
                 </Button>
               )}
+
+              {/* Handover Documents Button */}
+              <Button
+                type="button"
+                onClick={() => setShowHandoverModal(true)}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Handover Documents (Gate Pass & Letters)
+              </Button>
               
               <Button
                 variant="outline"
@@ -1313,6 +1492,17 @@ const NewSale = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Handover Documents Modal */}
+      {completedSale && (
+        <HandoverModal
+          isOpen={showHandoverModal}
+          onClose={() => setShowHandoverModal(false)}
+          sale={completedSale.sales?.[0] || {}}
+          customer={completedSale.customerData}
+          vehicle={completedSale.cartItems?.[0]?.product || completedSale.cartItems?.[0]}
+        />
+      )}
     </div>
   );
 };

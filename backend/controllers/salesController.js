@@ -106,14 +106,20 @@ const createSale = async (req, res) => {
     let {
       invoiceId,
       customer,
+      customerCnic,
       customerEmail,
       customerPhone,
+      customerAddress,
       productId,
       quantity,
       paymentMethod,
       paymentType,
       status,
       notes,
+      chassisNumber,
+      motorNumber,
+      batterySerial,
+      color,
     } = req.body;
 
     // Auto-generate invoice ID if not provided
@@ -161,6 +167,32 @@ const createSale = async (req, res) => {
       });
     }
 
+    // If a chassisNumber was supplied, validate and link it
+    let matchedUnit = null;
+    if (chassisNumber) {
+      const cleanChassis = chassisNumber.trim().toUpperCase();
+      matchedUnit = product.units ? product.units.find(u => u.chassisNumber === cleanChassis) : null;
+      if (!matchedUnit) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Chassis number "${cleanChassis}" not found in this product's inventory`,
+        });
+      }
+      if (matchedUnit.status !== 'available') {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Unit with Chassis "${cleanChassis}" is currently ${matchedUnit.status}`,
+        });
+      }
+
+      // Auto-fill motor & battery details if not manually provided
+      if (!motorNumber && matchedUnit.motorNumber) motorNumber = matchedUnit.motorNumber;
+      if (!batterySerial && matchedUnit.batterySerial) batterySerial = matchedUnit.batterySerial;
+      if (!color && matchedUnit.color) color = matchedUnit.color;
+    }
+
     // Store product cost at time of sale for accurate profit calculation
     const productCost = product.cost;
     const salePrice = product.price;
@@ -169,23 +201,35 @@ const createSale = async (req, res) => {
     const sale = await Sales.create([{
       invoiceId,
       customer,
+      customerCnic,
       customerEmail,
       customerPhone,
+      customerAddress,
       product: productId,
-      model: product.model || product.name, // Use model if available, otherwise use name
+      model: product.model || product.name,
       quantity,
       price: salePrice,
-      cost: productCost, // Store cost at time of sale
+      cost: productCost,
       total: salePrice * quantity,
       paymentMethod,
       paymentType: paymentType || 'full',
       status: status || 'pending',
+      chassisNumber: chassisNumber ? chassisNumber.trim().toUpperCase() : undefined,
+      motorNumber: motorNumber ? motorNumber.trim().toUpperCase() : undefined,
+      batterySerial: batterySerial ? batterySerial.trim().toUpperCase() : undefined,
+      color: color ? color.trim() : undefined,
       soldBy: req.user._id,
       notes,
     }], { session });
 
-    // Update product stock if sale is completed
+    // Update product stock and unit status if sale is completed
     if (status === 'completed') {
+      if (matchedUnit) {
+        matchedUnit.status = 'sold';
+        matchedUnit.soldAt = new Date();
+        matchedUnit.saleInvoiceId = sale[0]._id;
+        matchedUnit.saleInvoiceNumber = invoiceId;
+      }
       product.stock -= quantity;
       await product.save({ session });
     }
@@ -249,9 +293,14 @@ const updateSale = async (req, res) => {
       });
     }
 
-    // Handle stock adjustments based on status changes
+    // Handle stock adjustments and unit status based on status changes
     if (oldStatus !== newStatus) {
-      // From any status to completed: reduce stock
+      // Find unit if sale was associated with a chassis number
+      const unit = (sale.chassisNumber && product.units) 
+        ? product.units.find(u => u.chassisNumber === sale.chassisNumber)
+        : null;
+
+      // From any status to completed: reduce stock, mark unit sold
       if (oldStatus !== 'completed' && newStatus === 'completed') {
         if (product.stock < sale.quantity) {
           await session.abortTransaction();
@@ -261,11 +310,23 @@ const updateSale = async (req, res) => {
           });
         }
         product.stock -= sale.quantity;
+        if (unit) {
+          unit.status = 'sold';
+          unit.soldAt = new Date();
+          unit.saleInvoiceId = sale._id;
+          unit.saleInvoiceNumber = sale.invoiceId;
+        }
       }
       
-      // From completed to any other status: restore stock
+      // From completed to any other status: restore stock, release unit
       if (oldStatus === 'completed' && newStatus !== 'completed') {
         product.stock += sale.quantity;
+        if (unit) {
+          unit.status = 'available';
+          unit.soldAt = undefined;
+          unit.saleInvoiceId = undefined;
+          unit.saleInvoiceNumber = undefined;
+        }
       }
       
       await product.save({ session });
@@ -319,10 +380,19 @@ const deleteSale = async (req, res) => {
       });
     }
 
-    // If sale was completed, restore stock
+    // If sale was completed, restore stock and release serialized unit
     if (sale.status === 'completed') {
       const product = await Product.findById(sale.product).session(session);
       if (product) {
+        if (sale.chassisNumber && product.units) {
+          const unit = product.units.find(u => u.chassisNumber === sale.chassisNumber);
+          if (unit) {
+            unit.status = 'available';
+            unit.soldAt = undefined;
+            unit.saleInvoiceId = undefined;
+            unit.saleInvoiceNumber = undefined;
+          }
+        }
         product.stock += sale.quantity;
         await product.save({ session });
       }

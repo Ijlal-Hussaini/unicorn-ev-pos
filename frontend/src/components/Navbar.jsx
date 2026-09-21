@@ -27,7 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { authAPI, productsAPI, salesAPI } from '../services/api';
+import { authAPI, notificationsAPI } from '../services/api';
 import { logout } from '../store/authSlice';
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,94 +43,56 @@ const Navbar = memo(() => {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Fetch notifications on mount and every 10 minutes
+  // Fetch notifications on mount and every 5 minutes
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 600000); // Refresh every 10 minutes (600000ms)
+    const interval = setInterval(fetchNotifications, 300000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const fetchNotifications = async () => {
     try {
       setLoadingNotifications(true);
-      
-      const newNotifications = [];
+      if (user?.role === 'admin' || user?.role === 'manager') {
+        const res = await notificationsAPI.getAll();
+        const rawData = res.data || [];
 
-      // Only Admin gets notifications
-      if (user?.role === 'admin') {
-        // Fetch products and sales in parallel
-        const [productsRes, salesRes] = await Promise.all([
-          productsAPI.getAll(),
-          salesAPI.getAll({ sortBy: 'createdAt', order: 'desc' })
-        ]);
+        const enriched = rawData.map(item => {
+          let icon = AlertTriangle;
+          let iconColor = 'text-red-400';
+          let bgColor = 'bg-red-500/10';
 
-        const products = productsRes.data || [];
-        const sales = salesRes.data || [];
+          if (item.type === 'low-stock') {
+            icon = Package;
+            iconColor = 'text-orange-400';
+            bgColor = 'bg-orange-500/10';
+          } else if (item.type.startsWith('installment')) {
+            icon = AlertTriangle;
+            iconColor = 'text-amber-400';
+            bgColor = 'bg-amber-500/10';
+          } else if (item.type === 'refund-pending') {
+            icon = AlertTriangle;
+            iconColor = 'text-purple-400';
+            bgColor = 'bg-purple-500/10';
+          } else if (item.type === 'sale-completed') {
+            icon = ShoppingCart;
+            iconColor = 'text-emerald-400';
+            bgColor = 'bg-emerald-500/10';
+          }
 
-        // Out of stock items
-        const outOfStock = products.filter(p => p.stock === 0);
-        outOfStock.forEach(product => {
-          newNotifications.push({
-            id: `out-${product._id}`,
-            type: 'out-of-stock',
-            icon: AlertTriangle,
-            iconColor: 'text-red-400',
-            bgColor: 'bg-red-500/10',
-            title: 'Out of Stock',
-            message: `${product.name || product.model} - 0 units left`,
-            time: 'Now',
-            unread: true,
-            clickable: false
-          });
+          return {
+            ...item,
+            icon,
+            iconColor,
+            bgColor,
+            clickable: !!item.link,
+            action: item.link ? () => navigate(item.link) : undefined,
+          };
         });
 
-        // Low stock items (1-10 units)
-        const lowStock = products.filter(p => p.stock > 0 && p.stock <= 10);
-        lowStock.slice(0, 5).forEach(product => {
-          newNotifications.push({
-            id: `low-${product._id}`,
-            type: 'low-stock',
-            icon: Package,
-            iconColor: 'text-orange-400',
-            bgColor: 'bg-orange-500/10',
-            title: 'Low Stock Alert',
-            message: `${product.name || product.model} - Only ${product.stock} unit${product.stock > 1 ? 's' : ''} left`,
-            time: 'Now',
-            unread: true,
-            clickable: false
-          });
-        });
-
-        // Recent sales (last 5)
-        const recentSales = sales.slice(0, 5);
-        recentSales.forEach(sale => {
-          const timeAgo = getTimeAgo(new Date(sale.createdAt));
-          newNotifications.push({
-            id: `sale-${sale._id}`,
-            type: 'sale',
-            icon: ShoppingCart,
-            iconColor: 'text-emerald-400',
-            bgColor: 'bg-emerald-500/10',
-            title: 'New Sale',
-            message: `${sale.customer} purchased ${sale.model}`,
-            time: timeAgo,
-            unread: timeAgo.includes('m') || timeAgo.includes('s'), // Mark as unread if less than 1 hour
-            clickable: true,
-            action: () => navigate(`/sales/view/${sale._id}`)
-          });
-        });
-
-        // Sort notifications: unread first, then by type priority
-        const sortedNotifications = newNotifications.sort((a, b) => {
-          if (a.unread !== b.unread) return b.unread - a.unread;
-          const typePriority = { 'out-of-stock': 3, 'low-stock': 2, 'sale': 1 };
-          return typePriority[b.type] - typePriority[a.type];
-        });
-
-        setNotifications(sortedNotifications);
-        setUnreadCount(sortedNotifications.filter(n => n.unread).length);
+        setNotifications(enriched);
+        setUnreadCount(res.unreadCount || enriched.filter(n => n.unread).length);
       } else {
-        // Sales users get no notifications
         setNotifications([]);
         setUnreadCount(0);
       }

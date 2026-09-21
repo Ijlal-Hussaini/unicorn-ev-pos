@@ -6,7 +6,10 @@ import {
   updateProduct,
   deleteProduct,
   updateStock,
-  getInventoryStats
+  getInventoryStats,
+  getAvailableUnits,
+  addSerializedUnit,
+  deleteSerializedUnit,
 } from '../controllers/productController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import { sanitizeBody, sanitizeQuery, validateProductData } from '../middleware/validation.js';
@@ -19,6 +22,11 @@ router.use(sanitizeQuery);
 
 // Inventory stats route (must be before /:id route) - Protected
 router.get('/stats/inventory', protect, getInventoryStats);
+
+// Serialized units routes
+router.get('/:id/units/available', protect, getAvailableUnits);
+router.post('/:id/units', protect, authorize('admin', 'manager'), addSerializedUnit);
+router.delete('/:id/units/:unitId', protect, authorize('admin', 'manager'), deleteSerializedUnit);
 
 // Main CRUD routes - All protected
 router.route('/')

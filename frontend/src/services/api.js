@@ -204,6 +204,33 @@ export const productsAPI = {
     });
     return handleResponse(response);
   },
+
+  getAvailableUnits: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/products/${id}/units/available`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    return handleResponse(response);
+  },
+
+  addUnit: async (id, unitData) => {
+    const response = await fetch(`${API_BASE_URL}/products/${id}/units`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(unitData),
+    });
+    return handleResponse(response);
+  },
+
+  deleteUnit: async (id, unitId) => {
+    const response = await fetch(`${API_BASE_URL}/products/${id}/units/${unitId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    return handleResponse(response);
+  },
 };
 
 // Sales API
@@ -716,4 +743,26 @@ export const installmentsAPI = {
     });
     return handleResponse(response);
   },
+
+  updateGuarantors: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/installments/${id}/guarantors`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
 };
+
+// Notifications API
+export const notificationsAPI = {
+  getAll: async () => {
+    const response = await fetch(`${API_BASE_URL}/notifications`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    return handleResponse(response);
+  },
+};
+

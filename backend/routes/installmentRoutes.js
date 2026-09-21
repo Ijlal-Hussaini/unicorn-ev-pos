@@ -9,6 +9,7 @@ import {
   cancelInstallmentPlan,
   getOverdueInstallments,
   getInstallmentStats,
+  updateGuarantors,
 } from '../controllers/installmentController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -28,6 +29,10 @@ router.route('/')
 // Single installment plan routes
 router.route('/:id')
   .get(protect, getInstallmentPlan);
+
+// Guarantor / KYC update route
+router.route('/:id/guarantors')
+  .put(protect, authorize('admin', 'sales', 'manager'), updateGuarantors);
 
 // Payment routes
 router.route('/:id/payment')

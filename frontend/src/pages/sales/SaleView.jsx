@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, FileText } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import NavigationPanel from '../../components/NavigationPanel';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { salesAPI } from '../../services/api';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '../../assets/Logo.png';
+import HandoverModal from '../../components/HandoverDocuments';
 
 const Badge = ({ children, className }) => (
   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>
@@ -22,6 +23,7 @@ const SaleView = () => {
   const reportRef = useRef();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
 
   useEffect(() => {
     fetchSale();
@@ -394,6 +396,14 @@ const SaleView = () => {
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
+                onClick={() => setShowHandoverModal(true)}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Handover Documents
+              </Button>
+              <Button 
+                variant="outline" 
                 onClick={handlePrint}
                 className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border-0"
               >
@@ -471,6 +481,18 @@ const SaleView = () => {
                   <p className="text-sm text-muted-foreground mb-1">Customer Since</p>
                   <p className="font-semibold">{new Date(sale.createdAt).toLocaleDateString()}</p>
                 </div>
+                {sale.customerCnic && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Customer CNIC</p>
+                    <p className="font-semibold font-mono text-cyan-400">{sale.customerCnic}</p>
+                  </div>
+                )}
+                {sale.customerAddress && (
+                  <div className="md:col-span-2">
+                    <p className="text-sm text-muted-foreground mb-1">Address</p>
+                    <p className="font-semibold">{sale.customerAddress}</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -544,6 +566,25 @@ const SaleView = () => {
                     <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
                     <p className="text-2xl font-bold text-cyan-400">Rs. {sale.total.toLocaleString()}</p>
                   </div>
+                  {sale.chassisNumber && (
+                    <div className="p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/30 md:col-span-2">
+                      <p className="text-xs uppercase font-bold text-cyan-400 mb-2">Serialized Vehicle Identification</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Chassis (VIN):</span>
+                          <p className="font-mono font-bold text-foreground text-sm">{sale.chassisNumber}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Motor Number:</span>
+                          <p className="font-mono font-bold text-foreground">{sale.motorNumber || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Battery Serial:</span>
+                          <p className="font-mono font-bold text-foreground">{sale.batterySerial || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -737,6 +778,28 @@ const SaleView = () => {
           </div>
         </div>
       </div>
+
+      {/* Handover Documents Modal */}
+      {sale && (
+        <HandoverModal
+          isOpen={showHandoverModal}
+          onClose={() => setShowHandoverModal(false)}
+          sale={sale}
+          customer={{
+            name: sale.customer,
+            cnic: sale.customerCnic,
+            phone: sale.customerPhone,
+            address: sale.customerAddress,
+          }}
+          vehicle={{
+            name: sale.model,
+            chassisNumber: sale.chassisNumber,
+            motorNumber: sale.motorNumber,
+            batterySerial: sale.batterySerial,
+            color: sale.color,
+          }}
+        />
+      )}
     </div>
   );
 };

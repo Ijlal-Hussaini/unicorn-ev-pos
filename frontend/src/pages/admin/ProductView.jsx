@@ -14,12 +14,19 @@ import {
   DollarSign,
   Box,
   Tag,
+  Plus,
+  CheckCircle2,
+  AlertCircle,
+  Hash,
+  ShieldCheck,
 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import NavigationPanel from '../../components/NavigationPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { productsAPI } from '../../services/api';
 
@@ -31,6 +38,14 @@ const ProductView = () => {
   const [product, setProduct] = useState(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [showAddUnitForm, setShowAddUnitForm] = useState(false);
+  const [addingUnit, setAddingUnit] = useState(false);
+  const [newUnit, setNewUnit] = useState({
+    chassisNumber: '',
+    motorNumber: '',
+    batterySerial: '',
+    color: '',
+  });
 
   useEffect(() => {
     fetchProduct();
@@ -68,6 +83,63 @@ const ProductView = () => {
       toast({
         title: 'Error',
         description: error.message || 'Failed to delete product',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleAddUnit = async (e) => {
+    e.preventDefault();
+    if (!newUnit.chassisNumber.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Chassis Number is required for serialized unit',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setAddingUnit(true);
+      const res = await productsAPI.addUnit(product._id, {
+        chassisNumber: newUnit.chassisNumber.trim(),
+        motorNumber: newUnit.motorNumber.trim() || undefined,
+        batterySerial: newUnit.batterySerial.trim() || undefined,
+        color: newUnit.color.trim() || undefined,
+      });
+      setProduct(res.data);
+      setNewUnit({ chassisNumber: '', motorNumber: '', batterySerial: '', color: '' });
+      setShowAddUnitForm(false);
+      toast({
+        title: 'Success',
+        description: 'Serialized unit added to inventory',
+        variant: 'success',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add unit',
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingUnit(false);
+    }
+  };
+
+  const handleDeleteUnit = async (unitId) => {
+    if (!confirm('Are you sure you want to remove this unit from inventory?')) return;
+    try {
+      const res = await productsAPI.deleteUnit(product._id, unitId);
+      setProduct(res.data);
+      toast({
+        title: 'Success',
+        description: 'Unit removed from inventory',
+        variant: 'success',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to remove unit',
         variant: 'destructive',
       });
     }
@@ -510,6 +582,199 @@ const ProductView = () => {
                       </div>
                     )}
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Serialized EV Units Tracking */}
+            {(product.category === 'EV Bikes' || (product.units && product.units.length > 0)) && (
+              <Card className="bg-card/90 border-border backdrop-blur-sm shadow-lg overflow-hidden">
+                <CardHeader className="border-b border-border/50 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-cyan-500/20 rounded-lg text-cyan-400">
+                        <Hash className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-xl">Serialized Units (Chassis & Motor)</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Track individual vehicle identification numbers, motor serials, and allocation status
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/30">
+                        Total: {product.units?.length || 0}
+                      </Badge>
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                        Available: {product.units?.filter((u) => u.status === 'available').length || 0}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        onClick={() => setShowAddUnitForm((prev) => !prev)}
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        {showAddUnitForm ? 'Cancel' : 'Add Unit'}
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-6 space-y-6">
+                  {/* Add Unit Form */}
+                  {showAddUnitForm && (
+                    <form
+                      onSubmit={handleAddUnit}
+                      className="p-4 rounded-xl border border-cyan-500/30 bg-cyan-950/10 space-y-4"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                        <span className="text-sm font-semibold text-cyan-400">Register New Vehicle Unit</span>
+                        <span className="text-xs text-muted-foreground">* Chassis number required</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Chassis Number *</Label>
+                          <Input
+                            placeholder="e.g. UN-EV2026-0091"
+                            value={newUnit.chassisNumber}
+                            onChange={(e) => setNewUnit({ ...newUnit, chassisNumber: e.target.value.toUpperCase() })}
+                            className="mt-1 font-mono text-xs uppercase"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Motor Number</Label>
+                          <Input
+                            placeholder="e.g. MTR-72V-8821"
+                            value={newUnit.motorNumber}
+                            onChange={(e) => setNewUnit({ ...newUnit, motorNumber: e.target.value.toUpperCase() })}
+                            className="mt-1 font-mono text-xs uppercase"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Battery Serial</Label>
+                          <Input
+                            placeholder="e.g. BAT-GRP-1102"
+                            value={newUnit.batterySerial}
+                            onChange={(e) => setNewUnit({ ...newUnit, batterySerial: e.target.value.toUpperCase() })}
+                            className="mt-1 font-mono text-xs uppercase"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Color / Variant</Label>
+                          <Input
+                            placeholder="e.g. Matte Black"
+                            value={newUnit.color}
+                            onChange={(e) => setNewUnit({ ...newUnit, color: e.target.value })}
+                            className="mt-1 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAddUnitForm(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={addingUnit}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                        >
+                          {addingUnit ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />}
+                          Save Unit
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Units List */}
+                  {(!product.units || product.units.length === 0) ? (
+                    <div className="text-center py-8 text-muted-foreground border border-dashed border-border rounded-xl">
+                      <Box className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
+                      <p className="text-sm">No serialized units registered yet.</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">
+                        Click "Add Unit" above to register chassis and motor numbers for inventory.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-border/60">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-accent/40 text-muted-foreground uppercase font-semibold border-b border-border/60">
+                          <tr>
+                            <th className="py-2.5 px-3">Chassis No</th>
+                            <th className="py-2.5 px-3">Motor No</th>
+                            <th className="py-2.5 px-3">Battery Serial</th>
+                            <th className="py-2.5 px-3">Color</th>
+                            <th className="py-2.5 px-3">Status</th>
+                            <th className="py-2.5 px-3">Sold Details</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/40 font-mono">
+                          {product.units.map((unit) => (
+                            <tr key={unit._id} className="hover:bg-accent/20 transition-colors">
+                              <td className="py-2.5 px-3 font-semibold text-cyan-400">
+                                {unit.chassisNumber}
+                              </td>
+                              <td className="py-2.5 px-3 text-foreground">
+                                {unit.motorNumber || '-'}
+                              </td>
+                              <td className="py-2.5 px-3 text-foreground">
+                                {unit.batterySerial || '-'}
+                              </td>
+                              <td className="py-2.5 px-3 font-sans text-muted-foreground">
+                                {unit.color || '-'}
+                              </td>
+                              <td className="py-2.5 px-3 font-sans">
+                                {unit.status === 'available' ? (
+                                  <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px]">
+                                    Available
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="bg-muted text-muted-foreground text-[10px]">
+                                    Sold
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 font-sans text-muted-foreground">
+                                {unit.status === 'sold' ? (
+                                  <div>
+                                    <span className="font-mono text-cyan-400 text-[11px] block">{unit.saleInvoiceNumber}</span>
+                                    {unit.soldAt && (
+                                      <span className="text-[10px] text-muted-foreground/70">
+                                        {new Date(unit.soldAt).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground/40">-</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-sans">
+                                {unit.status === 'available' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteUnit(unit._id)}
+                                    className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                    title="Remove Unit"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

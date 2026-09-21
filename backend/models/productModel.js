@@ -117,7 +117,43 @@ const productSchema = new mongoose.Schema({
       type: String,
       trim: true
     }
-  },
+  units: [{
+    chassisNumber: {
+      type: String,
+      trim: true,
+      uppercase: true
+    },
+    motorNumber: {
+      type: String,
+      trim: true,
+      uppercase: true
+    },
+    batterySerial: {
+      type: String,
+      trim: true,
+      uppercase: true
+    },
+    color: {
+      type: String,
+      trim: true
+    },
+    status: {
+      type: String,
+      enum: ['available', 'reserved', 'sold'],
+      default: 'available'
+    },
+    soldAt: {
+      type: Date
+    },
+    saleInvoiceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Sales'
+    },
+    saleInvoiceNumber: {
+      type: String,
+      trim: true
+    }
+  }],
   lastRestocked: {
     type: Date,
     default: Date.now
@@ -147,6 +183,11 @@ productSchema.virtual('profitPercentage').get(function() {
 
 // Method to update stock status
 productSchema.methods.updateStatus = function() {
+  // If product has serialized units, stock is determined by available units
+  if (this.category === 'EV Bikes' && Array.isArray(this.units) && this.units.length > 0) {
+    this.stock = this.units.filter(u => u.status === 'available').length;
+  }
+
   if (this.stock === 0) {
     this.status = 'out-of-stock';
   } else if (this.stock < this.minStock) {
@@ -168,6 +209,9 @@ productSchema.index({ status: 1 });
 productSchema.index({ supplier: 1 });
 productSchema.index({ category: 1 });
 productSchema.index({ createdAt: -1 });
+productSchema.index({ 'units.chassisNumber': 1 });
+productSchema.index({ 'units.motorNumber': 1 });
+productSchema.index({ 'units.status': 1 });
 
 const Product = mongoose.model('Product', productSchema);
 

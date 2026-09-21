@@ -11,6 +11,7 @@ import uploadRoutes from './routes/uploadRoutes.js';
 import reportsRoutes from './routes/reportsRoutes.js';
 import refundRoutes from './routes/refundRoutes.js';
 import installmentRoutes from './routes/installmentRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import logger from './utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -75,6 +76,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/refunds', refundRoutes);
 app.use('/api/installments', installmentRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Test route
 app.get('/api/test', (req, res) => {
