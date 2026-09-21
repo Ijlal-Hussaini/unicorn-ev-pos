@@ -2412,7 +2412,7 @@ const ManageInventory = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentData.map((item, index) => (
+                  {currentData.map((item) => (
                     <tr 
                       key={item._id}
                       className="border-b border-border/50 hover:bg-accent/30 transition-colors"

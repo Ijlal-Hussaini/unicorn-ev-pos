@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Users as UsersIcon,
@@ -54,7 +53,6 @@ import { useToast } from '@/hooks/use-toast';
 import { usersAPI } from '../../services/api';
 
 const Users = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { user: currentUser } = useSelector((state) => state.auth);
 

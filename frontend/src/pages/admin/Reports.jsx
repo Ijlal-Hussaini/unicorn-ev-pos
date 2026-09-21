@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { 
   Download,
@@ -32,10 +31,8 @@ const Badge = ({ children, className }) => (
 );
 
 const Reports = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const user = useSelector((state) => state.auth.user);
-  const reportRef = useRef();
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(null);

@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Printer, Scale, ShieldCheck } from 'lucide-react';
 
 export const InstallmentAgreementDocument = forwardRef(({ plan }, ref) => {
-  const dateStr = new Date(plan?.startDate || Date.now()).toLocaleDateString('en-PK', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+  const dateStr = plan?.startDate
+    ? new Date(plan.startDate).toLocaleDateString('en-PK', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '';
 
   const formatPKR = (amt) => {
     return new Intl.NumberFormat('en-PK', {

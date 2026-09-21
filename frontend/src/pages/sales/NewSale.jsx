@@ -321,7 +321,7 @@ const NewSale = () => {
     }
 
     // Email validation
-    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
     if (!emailRegex.test(customerDetails.email)) {
       toast({
         title: 'Error',

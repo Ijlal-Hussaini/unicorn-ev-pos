@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import NavigationPanel from '../../components/NavigationPanel';
-import { salesAPI, productsAPI, customersAPI } from '../../services/api';
+import { salesAPI, productsAPI } from '../../services/api';
 import { useToast } from '@/hooks/use-toast';
 
 const Badge = ({ children, className }) => (
@@ -30,7 +30,6 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [salesStats, setSalesStats] = useState(null);
   const [inventoryStats, setInventoryStats] = useState(null);
-  const [customerStats, setCustomerStats] = useState(null);
   const [recentSales, setRecentSales] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [dateRange, setDateRange] = useState('30'); // 7, 30, 90 days
@@ -45,17 +44,15 @@ const AdminDashboard = () => {
       setLoading(true);
       
       // Fetch all data in parallel
-      const [salesStatsRes, inventoryStatsRes, customerStatsRes, salesRes, chartRes] = await Promise.all([
+      const [salesStatsRes, inventoryStatsRes, salesRes, chartRes] = await Promise.all([
         salesAPI.getStats(),
         productsAPI.getStats(),
-        customersAPI.getStats(),
         salesAPI.getAll({ sortBy: 'createdAt', order: 'desc' }),
         salesAPI.getChartData({ groupBy: 'month' })
       ]);
 
       setSalesStats(salesStatsRes.data);
       setInventoryStats(inventoryStatsRes.data);
-      setCustomerStats(customerStatsRes.data);
       setRecentSales(salesRes.data.slice(0, 5)); // Get latest 5 sales
       setChartData(chartRes.data);
       

@@ -12,7 +12,9 @@
     "build:backend": "cd backend && npm install --production",
     "build:win": "npm run build && npm run build:backend && electron-builder --win",
     "build:all": "npm run build && npm run build:backend && electron-builder -mwl",
-    "package": "electron-builder"
+    "package": "electron-builder",
+    "test": "npm --prefix backend test",
+    "lint": "npm --prefix frontend run lint"
   },
   "keywords": [],
   "author": "",

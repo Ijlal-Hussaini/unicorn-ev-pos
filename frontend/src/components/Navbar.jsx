@@ -103,16 +103,6 @@ const Navbar = memo(() => {
     }
   };
 
-  const getTimeAgo = (date) => {
-    const seconds = Math.floor((new Date() - date) / 1000);
-    
-    if (seconds < 60) return `${seconds}s ago`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    return date.toLocaleDateString();
-  };
-
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
     setUnreadCount(0);
@@ -161,10 +151,6 @@ const Navbar = memo(() => {
 
   const handleLogoClick = () => {
     navigate('/admin/dashboard');
-  };
-
-  const handleProfileClick = () => {
-    navigate('/profile');
   };
 
   // Get user initials

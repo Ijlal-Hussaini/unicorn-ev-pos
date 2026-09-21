@@ -128,7 +128,7 @@ const ExampleAPICall = async ({ user }) => {
 // ============================================
 // Example 8: Protect component actions
 // ============================================
-const ExampleProtectedActions = ({ user, sale }) => {
+const ExampleProtectedActions = ({ user, sale: _sale }) => {
   const canEdit = hasPermission(user, 'EDIT_SALE');
   const canDelete = hasPermission(user, 'DELETE_SALE');
   

@@ -117,6 +117,7 @@ const productSchema = new mongoose.Schema({
       type: String,
       trim: true
     }
+  },
   units: [{
     chassisNumber: {
       type: String,

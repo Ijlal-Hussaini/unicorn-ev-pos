@@ -4,15 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Printer, ShieldCheck, FileText, KeyRound } from 'lucide-react';
 
 export const GatePass = forwardRef(({ sale, customer, vehicle }, ref) => {
-  const dateStr = new Date(sale?.createdAt || Date.now()).toLocaleDateString('en-PK', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-  const timeStr = new Date(sale?.createdAt || Date.now()).toLocaleTimeString('en-PK', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const saleDate = sale?.createdAt ? new Date(sale.createdAt) : null;
+  const dateStr = saleDate
+    ? saleDate.toLocaleDateString('en-PK', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })
+    : '';
+  const timeStr = saleDate
+    ? saleDate.toLocaleTimeString('en-PK', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+  const passNumber = sale?.invoiceId ? `GP-${sale.invoiceId.replace('INV-', '')}` : 'GP-NEW';
 
   return (
     <div ref={ref} className="bg-white text-black p-8 max-w-[800px] mx-auto border border-gray-300 font-sans print:border-none print:p-4">
@@ -29,7 +35,7 @@ export const GatePass = forwardRef(({ sale, customer, vehicle }, ref) => {
           <span className="inline-block px-3 py-1 bg-black text-white text-xs font-bold uppercase tracking-widest rounded">
             Official Gate Pass
           </span>
-          <p className="text-xs text-gray-700 font-mono mt-2 font-bold">PASS #: GP-{sale?.invoiceId?.replace('INV-', '') || Date.now()}</p>
+          <p className="text-xs text-gray-700 font-mono mt-2 font-bold">PASS #: {passNumber}</p>
           <p className="text-xs text-gray-500">Date: {dateStr} {timeStr}</p>
         </div>
       </div>
@@ -106,11 +112,13 @@ export const GatePass = forwardRef(({ sale, customer, vehicle }, ref) => {
 GatePass.displayName = 'GatePass';
 
 export const RegistrationLetter = forwardRef(({ sale, customer, vehicle }, ref) => {
-  const dateStr = new Date(sale?.createdAt || Date.now()).toLocaleDateString('en-PK', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+  const dateStr = sale?.createdAt
+    ? new Date(sale.createdAt).toLocaleDateString('en-PK', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '';
 
   return (
     <div ref={ref} className="bg-white text-black p-10 max-w-[800px] mx-auto border border-gray-300 font-serif leading-relaxed print:border-none print:p-4">
@@ -215,11 +223,13 @@ export const RegistrationLetter = forwardRef(({ sale, customer, vehicle }, ref) 
 RegistrationLetter.displayName = 'RegistrationLetter';
 
 export const WarrantyCertificate = forwardRef(({ sale, customer, vehicle }, ref) => {
-  const dateStr = new Date(sale?.createdAt || Date.now()).toLocaleDateString('en-PK', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  const dateStr = sale?.createdAt
+    ? new Date(sale.createdAt).toLocaleDateString('en-PK', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })
+    : '';
 
   return (
     <div ref={ref} className="bg-white text-black p-8 max-w-[800px] mx-auto border-2 border-blue-900 rounded-lg font-sans print:border-none print:p-4">

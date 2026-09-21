@@ -14,21 +14,17 @@ import { loginStart, loginSuccess, loginFailure } from '../store/authSlice';
 import { useToast } from '@/hooks/use-toast';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    const savedRememberMe = localStorage.getItem('rememberMe');
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    return savedRememberMe === 'true' && savedEmail ? savedEmail : '';
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === 'true');
   
   useEffect(() => {
-    const savedEmail = localStorage.getItem('rememberedEmail');
-    const savedRememberMe = localStorage.getItem('rememberMe');
-    
-    if (savedRememberMe === 'true' && savedEmail) {
-      setEmail(savedEmail);
-      setRememberMe(true);
-    }
-    
-    // Reset form state when component mounts (e.g., after logout)
+    // Reset form state when component unmounts
     return () => {
       setEmail('');
       setPassword('');

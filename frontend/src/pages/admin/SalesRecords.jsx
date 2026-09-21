@@ -55,8 +55,8 @@ const SalesRecords = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const sortBy = 'createdAt';
+  const sortOrder = 'desc';
   const [showFilters, setShowFilters] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const itemsPerPage = 10;
@@ -559,7 +559,6 @@ const SalesRecords = () => {
     }, 0);
     const completedSales = filteredData.filter(s => s.status === 'completed').length;
     const pendingSales = filteredData.filter(s => s.status === 'pending').length;
-    const refundedSales = filteredData.filter(s => s.status === 'refunded').length;
 
     const paymentMethodStats = filteredData.reduce((acc, sale) => {
       if (!acc[sale.paymentMethod]) {
