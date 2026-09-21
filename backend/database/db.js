@@ -45,8 +45,7 @@ const connectDB = async (retryCount = 0) => {
             return connectDB(retryCount + 1);
         }
 
-        console.error('FATAL: MongoDB connection failed after multiple attempts:', error.message);
-        throw error;
+        logger.error('MongoDB connection could not be established after maximum retries. Please check network/DNS or cluster status.', { error: error.message });
     }
 }
 

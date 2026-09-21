@@ -115,7 +115,9 @@ app.listen(PORT, () => {
   console.log('Electron App:', process.env.ELECTRON_APP || 'false');
   console.log('='.repeat(60));
   
-  connectDB();
+  connectDB().catch(err => {
+    logger.error('Initial connectDB call encountered error', { error: err.message });
+  });
   logger.info(`Server is listening at port ${PORT}`);
   logger.info('Environment check', {
     mongoUri: process.env.MONGO_URI ? 'Set' : 'NOT SET',
