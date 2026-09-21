@@ -2,6 +2,7 @@ import Installment from '../models/installmentModel.js';
 import InstallmentPayment from '../models/installmentPaymentModel.js';
 import Sales from '../models/salesModel.js';
 import Product from '../models/productModel.js';
+import { getSafeSession, commitSafeSession, abortSafeSession } from '../utils/transactionHelper.js';
 
 // Helper function to format currency
 const formatCurrency = (amount) => {
@@ -169,7 +170,7 @@ const getInstallmentPlan = async (req, res) => {
 // @route   POST /api/installments
 // @access  Private
 const createInstallmentPlan = async (req, res) => {
-  const session = await Installment.startSession();
+  const session = await getSafeSession();
   
   try {
     const {
@@ -184,15 +185,13 @@ const createInstallmentPlan = async (req, res) => {
       notes,
     } = req.body;
     
-    await session.startTransaction();
-    
     // Get sale details
     const sale = await Sales.findById(saleId)
       .populate('product')
       .session(session);
     
     if (!sale) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Sale not found',
@@ -201,7 +200,7 @@ const createInstallmentPlan = async (req, res) => {
     
     // Validate sale is eligible for installment (must have paymentType='installment')
     if (sale.paymentType !== 'installment') {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'This sale is not eligible for installment. Only sales with payment type "installment" can have installment plans.',
@@ -211,7 +210,7 @@ const createInstallmentPlan = async (req, res) => {
     // Validate sale doesn't already have installment plan
     const existingPlan = await Installment.findOne({ sale: saleId }).session(session);
     if (existingPlan) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'This sale already has an installment plan',
@@ -220,7 +219,7 @@ const createInstallmentPlan = async (req, res) => {
     
     // Validate down payment
     if (downPayment < 0 || downPayment >= sale.total) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'Down payment must be between 0 and total amount',
@@ -234,7 +233,7 @@ const createInstallmentPlan = async (req, res) => {
     planStartDate.setHours(0, 0, 0, 0);
     
     if (planStartDate < today) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'Start date cannot be in the past',
@@ -297,7 +296,7 @@ const createInstallmentPlan = async (req, res) => {
     sale.hasInstallmentPlan = true;
     await sale.save({ session });
     
-    await session.commitTransaction();
+    await commitSafeSession(session);
     
     const populatedPlan = await Installment.findById(plan[0]._id)
       .populate('product', 'sku model category name')
@@ -310,15 +309,13 @@ const createInstallmentPlan = async (req, res) => {
       data: populatedPlan,
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortSafeSession(session);
     
     res.status(400).json({
       success: false,
       message: 'Error creating installment plan',
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -326,17 +323,15 @@ const createInstallmentPlan = async (req, res) => {
 // @route   POST /api/installments/:id/payment
 // @access  Private
 const recordPayment = async (req, res) => {
-  const session = await InstallmentPayment.startSession();
+  const session = await getSafeSession();
   
   try {
     const { amount, paymentMethod, notes } = req.body;
     
-    await session.startTransaction();
-    
     const plan = await Installment.findById(req.params.id).session(session);
     
     if (!plan) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Installment plan not found',
@@ -344,7 +339,7 @@ const recordPayment = async (req, res) => {
     }
     
     if (plan.status !== 'active') {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: `Cannot record payment for ${plan.status} plan`,
@@ -352,7 +347,7 @@ const recordPayment = async (req, res) => {
     }
     
     if (plan.paidInstallments >= plan.numberOfInstallments) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'All installments have been paid',
@@ -370,7 +365,7 @@ const recordPayment = async (req, res) => {
     const maxAmount = expectedAmount * 1.1; // Allow 10% overpayment
     
     if (amount < minAmount) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: `Payment amount too low. Expected: ${formatCurrency(expectedAmount)}, Minimum: ${formatCurrency(minAmount)}`,
@@ -378,7 +373,7 @@ const recordPayment = async (req, res) => {
     }
     
     if (amount > maxAmount) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: `Payment amount too high. Expected: ${formatCurrency(expectedAmount)}, Maximum: ${formatCurrency(maxAmount)}`,
@@ -439,7 +434,7 @@ const recordPayment = async (req, res) => {
     
     await plan.save({ session });
     
-    await session.commitTransaction();
+    await commitSafeSession(session);
     
     const populatedPayment = await InstallmentPayment.findById(payment[0]._id)
       .populate('installmentPlan')
@@ -451,15 +446,13 @@ const recordPayment = async (req, res) => {
       data: populatedPayment,
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortSafeSession(session);
     
     res.status(400).json({
       success: false,
       message: 'Error recording payment',
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
 

@@ -1,6 +1,7 @@
 import Refund from '../models/refundModel.js';
 import Sales from '../models/salesModel.js';
 import Product from '../models/productModel.js';
+import { getSafeSession, commitSafeSession, abortSafeSession } from '../utils/transactionHelper.js';
 
 // Generate refund ID with collision handling
 const generateRefundId = async () => {
@@ -136,9 +137,11 @@ const getRefund = async (req, res) => {
 
 // @desc    Create new refund
 // @route   POST /api/refunds
+// @desc    Create new refund
+// @route   POST /api/refunds
 // @access  Private
 const createRefund = async (req, res) => {
-  const session = await Refund.startSession();
+  const session = await getSafeSession();
   
   try {
     const {
@@ -153,14 +156,12 @@ const createRefund = async (req, res) => {
 
     // Validate quantity
     if (!quantityRefunded || quantityRefunded < 1) {
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'Refund quantity must be at least 1',
       });
     }
-
-    // Start transaction
-    await session.startTransaction();
 
     // Get original sale
     const sale = await Sales.findById(saleId)
@@ -168,7 +169,7 @@ const createRefund = async (req, res) => {
       .session(session);
 
     if (!sale) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Original sale not found',
@@ -177,7 +178,7 @@ const createRefund = async (req, res) => {
 
     // Check if sale is completed
     if (sale.status !== 'completed') {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'Can only refund completed sales',
@@ -186,7 +187,7 @@ const createRefund = async (req, res) => {
 
     // Check if sale is already fully refunded
     if (sale.isFullyRefunded) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'This sale has already been fully refunded',
@@ -195,7 +196,7 @@ const createRefund = async (req, res) => {
 
     // Check if quantity is valid
     if (quantityRefunded > sale.quantity) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: `Cannot refund more than original quantity (${sale.quantity})`,
@@ -210,7 +211,7 @@ const createRefund = async (req, res) => {
     const totalRefunded = existingRefunds.reduce((sum, ref) => sum + ref.quantityRefunded, 0);
     
     if (totalRefunded + quantityRefunded > sale.quantity) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: `Cannot refund ${quantityRefunded} units. Already refunded: ${totalRefunded}, Available: ${sale.quantity - totalRefunded}`,
@@ -249,7 +250,7 @@ const createRefund = async (req, res) => {
     }], { session });
 
     // Commit transaction
-    await session.commitTransaction();
+    await commitSafeSession(session);
 
     // Populate the refund data
     const populatedRefund = await Refund.findById(refund[0]._id)
@@ -263,32 +264,27 @@ const createRefund = async (req, res) => {
       data: populatedRefund,
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortSafeSession(session);
     
     res.status(400).json({
       success: false,
       message: 'Error creating refund',
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
 
 // @desc    Approve refund
-// @desc    Approve refund
 // @route   PUT /api/refunds/:id/approve
 // @access  Private (Manager/Admin)
 const approveRefund = async (req, res) => {
-  const session = await Refund.startSession();
+  const session = await getSafeSession();
   
   try {
-    await session.startTransaction();
-
     const refund = await Refund.findById(req.params.id).session(session);
 
     if (!refund) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Refund not found',
@@ -296,7 +292,7 @@ const approveRefund = async (req, res) => {
     }
 
     if (refund.status !== 'pending') {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: `Cannot approve refund with status: ${refund.status}`,
@@ -347,7 +343,7 @@ const approveRefund = async (req, res) => {
       }
     }
 
-    await session.commitTransaction();
+    await commitSafeSession(session);
 
     // Populate and return updated refund
     const updatedRefund = await Refund.findById(refund._id)
@@ -362,15 +358,13 @@ const approveRefund = async (req, res) => {
       data: updatedRefund,
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortSafeSession(session);
     
     res.status(400).json({
       success: false,
       message: 'Error approving refund',
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -478,15 +472,13 @@ const completeRefund = async (req, res) => {
 // @route   DELETE /api/refunds/:id
 // @access  Private (Admin)
 const deleteRefund = async (req, res) => {
-  const session = await Refund.startSession();
+  const session = await getSafeSession();
   
   try {
-    await session.startTransaction();
-
     const refund = await Refund.findById(req.params.id).session(session);
 
     if (!refund) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Refund not found',
@@ -530,22 +522,20 @@ const deleteRefund = async (req, res) => {
     }
 
     await Refund.findByIdAndDelete(req.params.id).session(session);
-    await session.commitTransaction();
+    await commitSafeSession(session);
 
     res.status(200).json({
       success: true,
       message: 'Refund deleted successfully. All changes have been reverted.',
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortSafeSession(session);
     
     res.status(500).json({
       success: false,
       message: 'Error deleting refund',
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
 

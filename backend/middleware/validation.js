@@ -97,8 +97,9 @@ export const validateSaleData = (req, res, next) => {
 
   const errors = [];
 
-  if (!invoiceId || typeof invoiceId !== 'string') {
-    errors.push('Valid invoice ID is required');
+  // invoiceId is optional because salesController auto-generates if not provided
+  if (invoiceId !== undefined && (typeof invoiceId !== 'string' || !invoiceId.trim())) {
+    errors.push('Valid invoice ID must be a non-empty string');
   }
 
   if (!customer || typeof customer !== 'string') {
@@ -140,6 +141,15 @@ export const validateSaleData = (req, res, next) => {
 
 // Validate product creation data
 export const validateProductData = (req, res, next) => {
+  // Support both cost and costPrice
+  if (req.body.cost === undefined && req.body.costPrice !== undefined) {
+    req.body.cost = req.body.costPrice;
+  }
+  // Default supplier if omitted
+  if (!req.body.supplier || typeof req.body.supplier !== 'string' || !req.body.supplier.trim()) {
+    req.body.supplier = 'Unicorn EV OEM';
+  }
+
   const { sku, name, price, cost, stock, minStock, supplier, category } = req.body;
 
   const errors = [];

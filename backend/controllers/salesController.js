@@ -1,6 +1,7 @@
 import Sales from '../models/salesModel.js';
 import Product from '../models/productModel.js';
 import { generateInvoiceId } from '../utils/invoiceGenerator.js';
+import { getSafeSession, commitSafeSession, abortSafeSession } from '../utils/transactionHelper.js';
 
 // @desc    Get all sales
 // @route   GET /api/sales
@@ -99,8 +100,8 @@ const getSale = async (req, res) => {
 // @route   POST /api/sales
 // @access  Private
 const createSale = async (req, res) => {
-  // Start a session for transaction
-  const session = await Sales.startSession();
+  // Start a safe session (uses replica set transaction if supported, direct if standalone)
+  const session = await getSafeSession();
   
   try {
     let {
@@ -129,29 +130,27 @@ const createSale = async (req, res) => {
 
     // Validate quantity
     if (!quantity || quantity < 1) {
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'Quantity must be at least 1',
       });
     }
 
-    // Start transaction
-    await session.startTransaction();
-
     // Check if invoice ID already exists
     const existingSale = await Sales.findOne({ invoiceId }).session(session);
     if (existingSale) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: 'Invoice ID already exists',
       });
     }
 
-    // Get product details with lock
+    // Get product details
     const product = await Product.findById(productId).session(session);
     if (!product) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Product not found',
@@ -160,7 +159,7 @@ const createSale = async (req, res) => {
 
     // Check stock availability
     if (product.stock < quantity) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(400).json({
         success: false,
         message: `Insufficient stock. Available: ${product.stock}`,
@@ -173,14 +172,14 @@ const createSale = async (req, res) => {
       const cleanChassis = chassisNumber.trim().toUpperCase();
       matchedUnit = product.units ? product.units.find(u => u.chassisNumber === cleanChassis) : null;
       if (!matchedUnit) {
-        await session.abortTransaction();
+        await abortSafeSession(session);
         return res.status(400).json({
           success: false,
           message: `Chassis number "${cleanChassis}" not found in this product's inventory`,
         });
       }
       if (matchedUnit.status !== 'available') {
-        await session.abortTransaction();
+        await abortSafeSession(session);
         return res.status(400).json({
           success: false,
           message: `Unit with Chassis "${cleanChassis}" is currently ${matchedUnit.status}`,
@@ -213,17 +212,18 @@ const createSale = async (req, res) => {
       total: salePrice * quantity,
       paymentMethod,
       paymentType: paymentType || 'full',
-      status: status || 'pending',
+      status: status || 'completed',
       chassisNumber: chassisNumber ? chassisNumber.trim().toUpperCase() : undefined,
       motorNumber: motorNumber ? motorNumber.trim().toUpperCase() : undefined,
       batterySerial: batterySerial ? batterySerial.trim().toUpperCase() : undefined,
       color: color ? color.trim() : undefined,
       soldBy: req.user._id,
       notes,
-    }], { session });
+    }], session ? { session } : {});
 
     // Update product stock and unit status if sale is completed
-    if (status === 'completed') {
+    const effectiveStatus = status || 'completed';
+    if (effectiveStatus === 'completed') {
       if (matchedUnit) {
         matchedUnit.status = 'sold';
         matchedUnit.soldAt = new Date();
@@ -231,11 +231,11 @@ const createSale = async (req, res) => {
         matchedUnit.saleInvoiceNumber = invoiceId;
       }
       product.stock -= quantity;
-      await product.save({ session });
+      await product.save(session ? { session } : {});
     }
 
-    // Commit transaction
-    await session.commitTransaction();
+    // Commit transaction if active
+    await commitSafeSession(session);
 
     // Populate the sale data
     const populatedSale = await Sales.findById(sale[0]._id)
@@ -248,17 +248,13 @@ const createSale = async (req, res) => {
       data: populatedSale,
     });
   } catch (error) {
-    // Abort transaction on error
-    await session.abortTransaction();
+    await abortSafeSession(session);
     
     res.status(400).json({
       success: false,
       message: 'Error creating sale',
       error: error.message,
     });
-  } finally {
-    // End session
-    session.endSession();
   }
 };
 
@@ -266,15 +262,13 @@ const createSale = async (req, res) => {
 // @route   PUT /api/sales/:id
 // @access  Private
 const updateSale = async (req, res) => {
-  const session = await Sales.startSession();
+  const session = await getSafeSession();
   
   try {
-    await session.startTransaction();
-
     const sale = await Sales.findById(req.params.id).session(session);
 
     if (!sale) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Sale not found',
@@ -286,7 +280,7 @@ const updateSale = async (req, res) => {
     const product = await Product.findById(sale.product).session(session);
 
     if (!product) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Associated product not found',
@@ -303,7 +297,7 @@ const updateSale = async (req, res) => {
       // From any status to completed: reduce stock, mark unit sold
       if (oldStatus !== 'completed' && newStatus === 'completed') {
         if (product.stock < sale.quantity) {
-          await session.abortTransaction();
+          await abortSafeSession(session);
           return res.status(400).json({
             success: false,
             message: `Insufficient stock. Available: ${product.stock}`,
@@ -336,7 +330,7 @@ const updateSale = async (req, res) => {
     Object.assign(sale, req.body);
     await sale.save({ session });
 
-    await session.commitTransaction();
+    await commitSafeSession(session);
 
     // Populate and return updated sale
     const updatedSale = await Sales.findById(sale._id)
@@ -349,15 +343,13 @@ const updateSale = async (req, res) => {
       data: updatedSale,
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortSafeSession(session);
     
     res.status(400).json({
       success: false,
       message: 'Error updating sale',
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -365,15 +357,13 @@ const updateSale = async (req, res) => {
 // @route   DELETE /api/sales/:id
 // @access  Private (Admin)
 const deleteSale = async (req, res) => {
-  const session = await Sales.startSession();
+  const session = await getSafeSession();
   
   try {
-    await session.startTransaction();
-
     const sale = await Sales.findById(req.params.id).session(session);
 
     if (!sale) {
-      await session.abortTransaction();
+      await abortSafeSession(session);
       return res.status(404).json({
         success: false,
         message: 'Sale not found',
@@ -399,22 +389,20 @@ const deleteSale = async (req, res) => {
     }
 
     await Sales.findByIdAndDelete(req.params.id).session(session);
-    await session.commitTransaction();
+    await commitSafeSession(session);
 
     res.status(200).json({
       success: true,
       message: 'Sale deleted successfully',
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortSafeSession(session);
     
     res.status(500).json({
       success: false,
       message: 'Error deleting sale',
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
 

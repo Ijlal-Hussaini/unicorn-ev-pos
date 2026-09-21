@@ -45,6 +45,24 @@ const connectDB = async (retryCount = 0) => {
             return connectDB(retryCount + 1);
         }
 
+        // Fallback: If remote cluster connection fails, try local MongoDB service
+        if (process.env.MONGO_URI && !process.env.MONGO_URI.includes('127.0.0.1') && !process.env.MONGO_URI.includes('localhost')) {
+            try {
+                logger.warn('Remote MongoDB unreachable. Attempting fallback connection to local MongoDB (mongodb://127.0.0.1:27017/UnicornEV)...');
+                await mongoose.connect('mongodb://127.0.0.1:27017/UnicornEV', {
+                    serverSelectionTimeoutMS: 5000,
+                    socketTimeoutMS: 45000
+                });
+                logger.info('Connected to local fallback MongoDB successfully', {
+                    host: mongoose.connection.host,
+                    name: mongoose.connection.name
+                });
+                return;
+            } catch (fallbackErr) {
+                logger.error('Local fallback MongoDB connection also failed', { error: fallbackErr.message });
+            }
+        }
+
         logger.error('MongoDB connection could not be established after maximum retries. Please check network/DNS or cluster status.', { error: error.message });
     }
 }
